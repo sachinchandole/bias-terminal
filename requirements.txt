@@ -1,0 +1,6 @@
+Flask==3.0.3
+flask-cors==4.0.1
+gunicorn==22.0.0
+nselib==2.5.1
+pandas==2.2.2
+requests==2.32.3

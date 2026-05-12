@@ -1,0 +1,872 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Market Bias Terminal · Nifty / Bank Nifty</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Outfit:wght@400;500;600;700;800&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #08090b;
+    --surface: #111316;
+    --surface-2: #16181c;
+    --border: #1f2228;
+    --border-subtle: #14161a;
+    --text: #fafafa;
+    --text-2: #a0a3aa;
+    --text-3: #6b6e76;
+    --bull: #00e676;
+    --bear: #ff5252;
+    --side: #ffb300;
+    --accent: #00b0ff;
+    --accent-dim: rgba(0, 176, 255, 0.15);
+    --bull-dim: rgba(0, 230, 118, 0.12);
+    --bear-dim: rgba(255, 82, 82, 0.12);
+    --side-dim: rgba(255, 179, 0, 0.12);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { background: var(--bg); color: var(--text); font-family: 'DM Sans', sans-serif; font-size: 14px; line-height: 1.55; min-height: 100vh; overflow-x: hidden; }
+  body::before { content: ''; position: fixed; inset: 0; background: radial-gradient(circle at 15% 0%, rgba(0,176,255,0.05), transparent 40%), radial-gradient(circle at 90% 100%, rgba(0,230,118,0.04), transparent 40%); pointer-events: none; z-index: 0; }
+  .wrap { position: relative; z-index: 1; max-width: 1320px; margin: 0 auto; padding: 24px 28px 80px; }
+
+  .header { display: flex; align-items: center; justify-content: space-between; padding-bottom: 20px; border-bottom: 1px solid var(--border); margin-bottom: 28px; flex-wrap: wrap; gap: 16px; }
+  .brand { display: flex; align-items: center; gap: 14px; }
+  .brand-mark { width: 38px; height: 38px; background: linear-gradient(135deg, var(--accent), #0080ff); border-radius: 9px; display: flex; align-items: center; justify-content: center; font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 16px; color: #000; box-shadow: 0 0 24px rgba(0,176,255,0.3); }
+  .brand-title { font-family: 'Outfit', sans-serif; font-size: 19px; font-weight: 700; letter-spacing: -0.01em; }
+  .brand-sub { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text-3); letter-spacing: 0.08em; text-transform: uppercase; margin-top: 1px; }
+  .header-right { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+  .date-block { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text-2); text-align: right; }
+  .date-block strong { color: var(--text); font-weight: 600; display: block; font-size: 13px; }
+  .status-pill { display: inline-flex; align-items: center; gap: 6px; padding: 5px 11px; background: var(--bull-dim); border: 1px solid rgba(0,230,118,0.3); border-radius: 6px; font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 600; letter-spacing: 0.06em; color: var(--bull); }
+  .status-pill.warn { background: var(--side-dim); border-color: rgba(255,179,0,0.3); color: var(--side); }
+  .status-pill.err { background: var(--bear-dim); border-color: rgba(255,82,82,0.3); color: var(--bear); }
+  .status-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+  .tabs { display: flex; gap: 4px; background: var(--surface); padding: 5px; border: 1px solid var(--border); border-radius: 10px; margin-bottom: 18px; width: fit-content; }
+  .tab { padding: 9px 22px; background: transparent; border: none; cursor: pointer; color: var(--text-2); font-family: 'Outfit', sans-serif; font-weight: 600; font-size: 13px; letter-spacing: 0.02em; border-radius: 7px; transition: all 0.2s; }
+  .tab.active { background: var(--surface-2); color: var(--text); box-shadow: inset 0 0 0 1px var(--border); }
+  .tab:hover:not(.active) { color: var(--text); }
+
+  /* PRIMARY FETCH BAR */
+  .fetch-bar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; padding: 16px 20px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; margin-bottom: 22px; }
+  .fetch-bar-icon { width: 36px; height: 36px; border-radius: 8px; background: var(--accent-dim); color: var(--accent); display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0; }
+  .fetch-bar-text { flex: 1; min-width: 200px; }
+  .fetch-bar-text strong { font-family: 'Outfit', sans-serif; font-size: 14px; font-weight: 600; display: block; }
+  .fetch-bar-text span { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text-3); }
+  .fetch-bar-status { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text-3); margin-right: 6px; }
+
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 24px; }
+  @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
+
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 20px 22px; position: relative; }
+  .card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; flex-wrap: wrap; gap: 8px; }
+  .card-title { font-family: 'Outfit', sans-serif; font-size: 12px; font-weight: 700; color: var(--text-2); text-transform: uppercase; letter-spacing: 0.12em; }
+  .card-badge { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--text-3); padding: 3px 8px; background: var(--surface-2); border-radius: 4px; }
+  .card-badge.fetched { background: var(--bull-dim); color: var(--bull); }
+  .card-badge.stale { background: var(--side-dim); color: var(--side); }
+  .card-badge.err { background: var(--bear-dim); color: var(--bear); }
+
+  .field-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 14px; }
+  .field { display: flex; flex-direction: column; gap: 5px; }
+  .field-label { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.08em; font-weight: 500; display: flex; align-items: center; gap: 6px; }
+  .field-label .hint { color: var(--text-3); opacity: 0.6; }
+  .field-label .auto { background: var(--accent-dim); color: var(--accent); font-size: 9px; padding: 1px 5px; border-radius: 3px; letter-spacing: 0.06em; }
+  .field input, .field select { width: 100%; background: var(--surface-2); border: 1px solid var(--border); border-radius: 7px; padding: 9px 11px; color: var(--text); font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 500; transition: border-color 0.15s, background 0.15s; }
+  .field input:focus, .field select:focus { outline: none; border-color: var(--accent); background: #0d1015; }
+  .field input::placeholder { color: var(--text-3); opacity: 0.4; }
+  .field input.fetched { border-color: rgba(0,230,118,0.3); background: rgba(0,230,118,0.04); }
+
+  .full-row { grid-column: 1 / -1; }
+  .helper { font-family: 'DM Sans', sans-serif; font-size: 11px; color: var(--text-3); line-height: 1.5; margin-top: 10px; padding-top: 12px; border-top: 1px dashed var(--border); }
+  .helper a { color: var(--accent); text-decoration: none; }
+  .helper a:hover { text-decoration: underline; }
+
+  .bias-card { background: linear-gradient(135deg, var(--surface), var(--surface-2)); border: 1px solid var(--border); border-radius: 14px; padding: 28px; margin-bottom: 24px; position: relative; overflow: hidden; }
+  .bias-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; background: var(--accent); transition: background 0.3s; }
+  .bias-card.bull::before { background: var(--bull); box-shadow: 0 0 30px var(--bull); }
+  .bias-card.bear::before { background: var(--bear); box-shadow: 0 0 30px var(--bear); }
+  .bias-card.side::before { background: var(--side); box-shadow: 0 0 30px var(--side); }
+  .bias-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; flex-wrap: wrap; gap: 14px; }
+  .bias-label { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.15em; margin-bottom: 6px; }
+  .bias-verdict { font-family: 'Outfit', sans-serif; font-size: 48px; font-weight: 800; letter-spacing: -0.025em; line-height: 1; }
+  .bias-verdict.bull { color: var(--bull); }
+  .bias-verdict.bear { color: var(--bear); }
+  .bias-verdict.side { color: var(--side); }
+  .bias-meta { margin-top: 10px; font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--text-2); }
+
+  .confidence-ring { width: 110px; height: 110px; position: relative; flex-shrink: 0; }
+  .confidence-ring svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+  .confidence-ring circle { fill: none; stroke-width: 8; }
+  .confidence-ring .track { stroke: var(--border); }
+  .confidence-ring .progress { stroke: var(--accent); transition: stroke-dashoffset 0.6s ease, stroke 0.3s; }
+  .confidence-ring.bull .progress { stroke: var(--bull); }
+  .confidence-ring.bear .progress { stroke: var(--bear); }
+  .confidence-ring.side .progress { stroke: var(--side); }
+  .confidence-val { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; font-family: 'JetBrains Mono', monospace; }
+  .confidence-val strong { font-size: 24px; font-weight: 700; color: var(--text); }
+  .confidence-val span { font-size: 9px; color: var(--text-3); letter-spacing: 0.1em; }
+
+  .levels-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; padding-top: 20px; border-top: 1px solid var(--border); }
+  @media (max-width: 600px) { .levels-grid { grid-template-columns: 1fr; } }
+  .level-block-title { font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 10px; color: var(--text-3); }
+  .level-block.resistance .level-block-title { color: var(--bear); }
+  .level-block.support .level-block-title { color: var(--bull); }
+  .level-row { display: flex; justify-content: space-between; align-items: baseline; padding: 6px 0; border-bottom: 1px dashed var(--border-subtle); font-family: 'JetBrains Mono', monospace; }
+  .level-row:last-child { border-bottom: none; }
+  .level-tag { font-size: 10px; color: var(--text-3); }
+  .level-val { font-size: 15px; font-weight: 600; color: var(--text); }
+
+  .components-card { padding: 22px; }
+  .component-row { display: grid; grid-template-columns: 140px 1fr 60px 40px; gap: 14px; align-items: center; padding: 9px 0; border-bottom: 1px dashed var(--border-subtle); }
+  .component-row:last-child { border-bottom: none; }
+  .component-name { font-family: 'Outfit', sans-serif; font-size: 13px; font-weight: 500; }
+  .component-bar { height: 6px; background: var(--surface-2); border-radius: 3px; overflow: hidden; position: relative; }
+  .component-bar::after { content: ''; position: absolute; top: 0; left: 50%; width: 1px; height: 100%; background: var(--text-3); opacity: 0.3; }
+  .component-fill { height: 100%; position: absolute; top: 0; transition: width 0.4s, background 0.3s; }
+  .component-score { font-family: 'JetBrains Mono', monospace; font-size: 12px; text-align: right; font-weight: 600; }
+  .component-signal { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.06em; }
+
+  .strategy-section { margin-top: 20px; padding: 16px 18px; background: rgba(0,176,255,0.04); border: 1px solid rgba(0,176,255,0.2); border-left: 3px solid var(--accent); border-radius: 8px; }
+  .strategy-title { font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--accent); margin-bottom: 8px; font-weight: 600; }
+  .strategy-text { font-family: 'DM Sans', sans-serif; font-size: 13px; line-height: 1.65; color: var(--text); }
+  .strategy-text strong { color: var(--accent); font-weight: 600; }
+
+  .actions-bar { display: flex; gap: 10px; margin-bottom: 24px; flex-wrap: wrap; }
+  .btn { padding: 10px 18px; border: none; border-radius: 7px; cursor: pointer; font-family: 'Outfit', sans-serif; font-weight: 600; font-size: 13px; letter-spacing: 0.02em; transition: transform 0.1s, box-shadow 0.15s, background 0.15s; display: inline-flex; align-items: center; gap: 7px; }
+  .btn:active { transform: translateY(1px); }
+  .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .btn-secondary { background: var(--accent-dim); color: var(--accent); border: 1px solid rgba(0,176,255,0.3); }
+  .btn-secondary:hover:not(:disabled) { background: rgba(0,176,255,0.2); }
+  .btn-primary { background: var(--accent); color: #000; }
+  .btn-primary:hover:not(:disabled) { background: #29c1ff; box-shadow: 0 0 24px rgba(0,176,255,0.4); }
+  .btn-copy { background: var(--surface-2); color: var(--text); border: 1px solid var(--border); }
+  .btn-copy:hover:not(:disabled) { background: #1c1f24; }
+  .btn-fetch { background: var(--bull-dim); color: var(--bull); border: 1px solid rgba(0,230,118,0.3); }
+  .btn-fetch:hover:not(:disabled) { background: rgba(0,230,118,0.2); }
+  .btn-small { padding: 6px 12px; font-size: 11px; }
+
+  .spinner { width: 12px; height: 12px; border: 2px solid currentColor; border-bottom-color: transparent; border-radius: 50%; display: inline-block; animation: spin 0.8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .history-table { width: 100%; border-collapse: collapse; font-family: 'JetBrains Mono', monospace; font-size: 12px; }
+  .history-table thead th { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--border); font-size: 10px; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.1em; font-weight: 600; }
+  .history-table tbody td { padding: 10px 12px; border-bottom: 1px dashed var(--border-subtle); }
+  .history-table tbody tr:hover { background: var(--surface-2); }
+  .history-table .verdict-cell { font-weight: 700; }
+  .history-table .verdict-cell.bull { color: var(--bull); }
+  .history-table .verdict-cell.bear { color: var(--bear); }
+  .history-table .verdict-cell.side { color: var(--side); }
+  .empty-state { text-align: center; padding: 30px 20px; color: var(--text-3); font-size: 13px; font-style: italic; }
+  .clear-btn { background: transparent; border: none; color: var(--text-3); cursor: pointer; font-family: 'JetBrains Mono', monospace; font-size: 11px; padding: 4px 8px; }
+  .clear-btn:hover { color: var(--bear); }
+
+  .toast { position: fixed; bottom: 24px; right: 24px; background: var(--surface); border: 1px solid var(--bull); color: var(--bull); padding: 11px 18px; border-radius: 8px; font-family: 'JetBrains Mono', monospace; font-size: 12px; box-shadow: 0 8px 32px rgba(0,0,0,0.5); transform: translateY(20px); opacity: 0; transition: all 0.3s; z-index: 1000; max-width: 360px; }
+  .toast.show { transform: translateY(0); opacity: 1; }
+
+  .footer { margin-top: 40px; padding-top: 24px; border-top: 1px solid var(--border); text-align: center; font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--text-3); letter-spacing: 0.1em; text-transform: uppercase; }
+  .footer a { color: var(--accent); text-decoration: none; }
+
+  .section-heading { font-family: 'Outfit', sans-serif; font-size: 11px; font-weight: 700; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.16em; margin: 32px 0 14px; display: flex; align-items: center; gap: 10px; }
+  .section-heading::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+  @media (max-width: 600px) {
+    .bias-verdict { font-size: 34px; }
+    .wrap { padding: 16px 14px 60px; }
+    .card { padding: 16px; }
+    .field-grid { grid-template-columns: 1fr; }
+    .component-row { grid-template-columns: 110px 1fr 50px 36px; gap: 8px; font-size: 11px; }
+    .component-name { font-size: 11px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="header">
+    <div class="brand">
+      <div class="brand-mark">α</div>
+      <div>
+        <div class="brand-title">MARKET BIAS TERMINAL</div>
+        <div class="brand-sub">NIFTY 50 · BANK NIFTY · LIVE NSE FEED</div>
+      </div>
+    </div>
+    <div class="header-right">
+      <div class="date-block">
+        <strong id="todayDate">—</strong>
+        <span id="sessionLabel">Pre-Market Read</span>
+      </div>
+      <div class="status-pill" id="apiStatus"><div class="status-dot"></div>CHECKING…</div>
+    </div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" data-asset="nifty">NIFTY 50</button>
+    <button class="tab" data-asset="banknifty">BANK NIFTY</button>
+  </div>
+
+  <!-- PRIMARY FETCH BAR -->
+  <div class="fetch-bar">
+    <div class="fetch-bar-icon">⚡</div>
+    <div class="fetch-bar-text">
+      <strong>Auto-fetch from NSE</strong>
+      <span id="lastFetch">Hits backend → fetches option chain, VIX, FII/DII, participant OI</span>
+    </div>
+    <span class="fetch-bar-status" id="fetchStatusText"></span>
+    <button class="btn btn-fetch" id="fetchAllBtn">↓ Fetch Now</button>
+    <button class="btn btn-primary" id="computeBtn">⚙ Compute Bias</button>
+  </div>
+
+  <!-- INPUTS -->
+  <div class="grid">
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">Price &amp; Participants</div>
+        <div class="card-badge" id="badge-participants">MANUAL</div>
+      </div>
+      <div class="field-grid">
+        <div class="field">
+          <label class="field-label">Spot Price <span class="auto">auto</span></label>
+          <input type="number" step="0.05" data-key="spot" placeholder="e.g. 25,350" />
+        </div>
+        <div class="field">
+          <label class="field-label">Prev Close <span class="auto">auto</span></label>
+          <input type="number" step="0.05" data-key="prevClose" placeholder="e.g. 25,280" />
+        </div>
+        <div class="field full-row">
+          <label class="field-label">FII Cash Net <span class="auto">auto</span> <span class="hint">(₹ Cr)</span></label>
+          <input type="number" step="1" data-key="fiiCash" placeholder="e.g. -1240" />
+        </div>
+        <div class="field full-row">
+          <label class="field-label">DII Cash Net <span class="auto">auto</span> <span class="hint">(₹ Cr)</span></label>
+          <input type="number" step="1" data-key="diiCash" placeholder="e.g. +890" />
+        </div>
+        <div class="field">
+          <label class="field-label">FII Idx Fut Long% <span class="auto">auto</span></label>
+          <input type="number" step="0.1" min="0" max="100" data-key="fiiLongPct" placeholder="e.g. 38" />
+        </div>
+        <div class="field">
+          <label class="field-label">FII Idx Fut Short% <span class="auto">auto</span></label>
+          <input type="number" step="0.1" min="0" max="100" data-key="fiiShortPct" placeholder="e.g. 62" />
+        </div>
+        <div class="field">
+          <label class="field-label">Client (Retail) Long%</label>
+          <input type="number" step="0.1" min="0" max="100" data-key="clientLongPct" placeholder="e.g. 55" />
+        </div>
+        <div class="field">
+          <label class="field-label">Pro (HNI) Long%</label>
+          <input type="number" step="0.1" min="0" max="100" data-key="proLongPct" placeholder="e.g. 48" />
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">Option Chain</div>
+        <div class="card-badge" id="badge-optionchain">MANUAL</div>
+      </div>
+      <div class="field-grid">
+        <div class="field">
+          <label class="field-label">PCR <span class="auto">auto</span></label>
+          <input type="number" step="0.01" data-key="pcr" placeholder="e.g. 0.95" />
+        </div>
+        <div class="field">
+          <label class="field-label">Max Pain <span class="auto">auto</span></label>
+          <input type="number" step="50" data-key="maxPain" placeholder="e.g. 25,300" />
+        </div>
+        <div class="field">
+          <label class="field-label">India VIX <span class="auto">auto</span></label>
+          <input type="number" step="0.01" data-key="vix" placeholder="e.g. 12.85" />
+        </div>
+        <div class="field">
+          <label class="field-label">VIX Change% <span class="auto">auto</span></label>
+          <input type="number" step="0.01" data-key="vixChange" placeholder="e.g. -2.3" />
+        </div>
+        <div class="field full-row">
+          <label class="field-label">Top Call OI Strikes <span class="auto">auto</span></label>
+          <input type="text" data-key="callOI" placeholder="e.g. 25500, 25600, 25400" />
+        </div>
+        <div class="field full-row">
+          <label class="field-label">Top Put OI Strikes <span class="auto">auto</span></label>
+          <input type="text" data-key="putOI" placeholder="e.g. 25200, 25000, 25100" />
+        </div>
+        <div class="field full-row">
+          <label class="field-label">OI Buildup Pattern <span class="auto">auto</span></label>
+          <select data-key="oiBehaviour">
+            <option value="">— select pattern —</option>
+            <option value="longBuildup">Long Buildup (Price ↑ · OI ↑)</option>
+            <option value="shortCovering">Short Covering (Price ↑ · OI ↓)</option>
+            <option value="longUnwinding">Long Unwinding (Price ↓ · OI ↓)</option>
+            <option value="shortBuildup">Short Buildup (Price ↓ · OI ↑)</option>
+            <option value="neutral">Mixed / Neutral</option>
+          </select>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="actions-bar">
+    <button class="btn btn-secondary" id="saveBtn">💾 Save Today's Read</button>
+    <button class="btn btn-copy" id="copyMsgBtn">📋 Copy Summary</button>
+    <button class="btn btn-copy" id="resetBtn">↺ Reset Inputs</button>
+  </div>
+
+  <!-- BIAS OUTPUT -->
+  <div class="section-heading">Bias Verdict</div>
+  <div class="bias-card side" id="biasCard">
+    <div class="bias-top">
+      <div>
+        <div class="bias-label">Today's Bias · <span id="biasAsset">NIFTY 50</span></div>
+        <div class="bias-verdict side" id="biasVerdict">AWAITING DATA</div>
+        <div class="bias-meta" id="biasMeta">Fetch from NSE or enter manually, then compute</div>
+      </div>
+      <div class="confidence-ring side" id="confRing">
+        <svg viewBox="0 0 100 100">
+          <circle class="track" cx="50" cy="50" r="42"/>
+          <circle class="progress" cx="50" cy="50" r="42" stroke-dasharray="263.9" stroke-dashoffset="263.9" id="confProgress"/>
+        </svg>
+        <div class="confidence-val"><strong id="confVal">—</strong><span>CONFIDENCE</span></div>
+      </div>
+    </div>
+    <div class="levels-grid">
+      <div class="level-block resistance">
+        <div class="level-block-title">↑ Resistance Levels</div>
+        <div id="resList"></div>
+      </div>
+      <div class="level-block support">
+        <div class="level-block-title">↓ Support Levels</div>
+        <div id="supList"></div>
+      </div>
+    </div>
+    <div class="strategy-section" id="strategyBox" style="display:none;">
+      <div class="strategy-title">⚡ Trading Plan</div>
+      <div class="strategy-text" id="strategyText"></div>
+    </div>
+  </div>
+
+  <div class="section-heading">Signal Breakdown</div>
+  <div class="card components-card">
+    <div id="componentsList"><div class="empty-state">Compute bias to see the contribution of each signal.</div></div>
+  </div>
+
+  <div class="section-heading">Bias History <button class="clear-btn" id="clearHistBtn">[clear all]</button></div>
+  <div class="card">
+    <table class="history-table">
+      <thead><tr><th>Date</th><th>Asset</th><th>Bias</th><th>Conf</th><th>Spot</th><th>R1</th><th>S1</th><th>PCR</th></tr></thead>
+      <tbody id="histBody"><tr><td colspan="8"><div class="empty-state">No saved reads yet.</div></td></tr></tbody>
+    </table>
+  </div>
+
+  <div class="footer">Educational tool · Not investment advice · Data via nselib (NSE public sources)</div>
+</div>
+
+<div class="toast" id="toast">Saved ✓</div>
+
+<script>
+/* ============================================
+   STATE
+   ============================================ */
+const STATE = {
+  asset: 'nifty',
+  data: { nifty: {}, banknifty: {} },
+  fetchedFlags: { nifty: {}, banknifty: {} },
+  bias: null,
+};
+const FIELDS = ['spot','prevClose','fiiCash','diiCash','fiiLongPct','fiiShortPct','clientLongPct','proLongPct','pcr','maxPain','vix','vixChange','callOI','putOI','oiBehaviour'];
+const AUTO_FIELDS = ['spot','prevClose','fiiCash','diiCash','fiiLongPct','fiiShortPct','pcr','maxPain','vix','vixChange','callOI','putOI','oiBehaviour'];
+
+/* ============================================
+   PERSISTENCE — uses localStorage on a hosted site
+   ============================================ */
+function loadState() {
+  try {
+    const s = localStorage.getItem('biasTerminalState');
+    if (s) {
+      const p = JSON.parse(s);
+      STATE.data = p.data || { nifty: {}, banknifty: {} };
+    }
+  } catch (e) {}
+}
+function saveState() {
+  try { localStorage.setItem('biasTerminalState', JSON.stringify({ data: STATE.data })); } catch (e) {}
+}
+function loadHistory() {
+  try { return JSON.parse(localStorage.getItem('biasTerminalHistory') || '[]'); } catch (e) { return []; }
+}
+function saveHistory(arr) { try { localStorage.setItem('biasTerminalHistory', JSON.stringify(arr)); } catch (e) {} }
+
+/* ============================================
+   UI
+   ============================================ */
+function setTodayDate() {
+  const d = new Date();
+  const day = d.toLocaleDateString('en-IN', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' });
+  document.getElementById('todayDate').textContent = day;
+  const h = d.getHours();
+  let label = 'Pre-Market Read';
+  if (h >= 9 && h < 15) label = 'Live Session';
+  else if (h >= 15 && h < 18) label = 'Post-Market Read';
+  else if (h >= 18) label = 'EOD Analysis';
+  document.getElementById('sessionLabel').textContent = label;
+}
+
+function renderInputs() {
+  const d = STATE.data[STATE.asset] || {};
+  const flags = STATE.fetchedFlags[STATE.asset] || {};
+  FIELDS.forEach(k => {
+    const el = document.querySelector(`[data-key="${k}"]`);
+    if (!el) return;
+    el.value = d[k] !== undefined ? d[k] : '';
+    if (flags[k]) el.classList.add('fetched'); else el.classList.remove('fetched');
+  });
+  document.getElementById('biasAsset').textContent = STATE.asset === 'nifty' ? 'NIFTY 50' : 'BANK NIFTY';
+  resetLevelLists();
+}
+
+function resetLevelLists() {
+  document.getElementById('resList').innerHTML = ['R1','R2','R3'].map(t => `<div class="level-row"><span class="level-tag">${t}</span><span class="level-val">—</span></div>`).join('');
+  document.getElementById('supList').innerHTML = ['S1','S2','S3'].map(t => `<div class="level-row"><span class="level-tag">${t}</span><span class="level-val">—</span></div>`).join('');
+}
+
+function bindInputs() {
+  document.querySelectorAll('[data-key]').forEach(el => {
+    el.addEventListener('input', () => {
+      const k = el.dataset.key;
+      STATE.data[STATE.asset][k] = el.value;
+      saveState();
+    });
+  });
+  document.querySelectorAll('.tab').forEach(b => {
+    b.addEventListener('click', () => {
+      document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
+      b.classList.add('active');
+      STATE.asset = b.dataset.asset;
+      STATE.bias = null;
+      renderInputs();
+      resetOutput();
+    });
+  });
+}
+
+/* ============================================
+   API
+   ============================================ */
+const API_BASE = '';   // same-origin
+
+async function apiHealth() {
+  try {
+    const r = await fetch(`${API_BASE}/api/health`, { cache: 'no-store' });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const j = await r.json();
+    return j.status === 'ok' && j.nse_available;
+  } catch (e) { return false; }
+}
+
+async function fetchSnapshot(symbol) {
+  const r = await fetch(`${API_BASE}/api/snapshot/${symbol}`, { cache: 'no-store' });
+  if (!r.ok) throw new Error('HTTP ' + r.status);
+  return r.json();
+}
+
+function setBadge(id, state, label) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.className = 'card-badge ' + state;
+  el.textContent = label;
+}
+
+/* ============================================
+   FETCH ORCHESTRATION
+   ============================================ */
+async function fetchAll() {
+  const btn = document.getElementById('fetchAllBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Fetching…';
+  document.getElementById('fetchStatusText').textContent = '';
+
+  try {
+    const symbol = STATE.asset === 'nifty' ? 'NIFTY' : 'BANKNIFTY';
+    const snap = await fetchSnapshot(symbol);
+    applySnapshot(snap);
+    const errs = snap.errors || {};
+    const errCount = Object.keys(errs).length;
+    if (errCount === 0) {
+      toast(`✓ All data fetched (${symbol})`);
+      document.getElementById('fetchStatusText').textContent = '✓ ' + new Date().toLocaleTimeString();
+    } else {
+      const errList = Object.keys(errs).join(', ');
+      toast(`⚠ Fetched partial · ${errCount} sources failed: ${errList}`, 'var(--side)');
+      document.getElementById('fetchStatusText').textContent = `⚠ ${errCount} partial`;
+    }
+  } catch (exc) {
+    console.error(exc);
+    toast('✗ Fetch failed: ' + exc.message + ' — try again or enter manually', 'var(--bear)');
+    document.getElementById('fetchStatusText').textContent = '✗ failed';
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '↓ Fetch Now';
+  }
+}
+
+function applySnapshot(snap) {
+  const d = STATE.data[STATE.asset];
+  const f = STATE.fetchedFlags[STATE.asset];
+
+  // Spot
+  if (snap.spot && snap.spot.spot != null) {
+    d.spot = snap.spot.spot;
+    if (snap.spot.prev_close != null) d.prevClose = snap.spot.prev_close;
+    f.spot = true; f.prevClose = true;
+  }
+
+  // Option chain
+  if (snap.option_chain && !snap.option_chain.error) {
+    const oc = snap.option_chain;
+    if (oc.pcr != null) { d.pcr = oc.pcr; f.pcr = true; }
+    if (oc.max_pain != null) { d.maxPain = oc.max_pain; f.maxPain = true; }
+    if (oc.top_call_oi_strikes && oc.top_call_oi_strikes.length) {
+      d.callOI = oc.top_call_oi_strikes.slice(0, 5).join(', '); f.callOI = true;
+    }
+    if (oc.top_put_oi_strikes && oc.top_put_oi_strikes.length) {
+      d.putOI = oc.top_put_oi_strikes.slice(0, 5).join(', '); f.putOI = true;
+    }
+    if (oc.oi_behaviour) { d.oiBehaviour = oc.oi_behaviour; f.oiBehaviour = true; }
+    const stale = oc.cached ? 'CACHED' : 'LIVE';
+    setBadge('badge-optionchain', oc.cached ? 'stale' : 'fetched', stale);
+  } else {
+    setBadge('badge-optionchain', 'err', 'FAIL');
+  }
+
+  // VIX
+  if (snap.vix && snap.vix.vix != null) {
+    d.vix = snap.vix.vix;
+    if (snap.vix.vix_change_pct != null) d.vixChange = snap.vix.vix_change_pct;
+    f.vix = true; f.vixChange = true;
+  }
+
+  // FII/DII cash
+  if (snap.fii_dii_cash) {
+    if (snap.fii_dii_cash.fii_cash != null) { d.fiiCash = snap.fii_dii_cash.fii_cash; f.fiiCash = true; }
+    if (snap.fii_dii_cash.dii_cash != null) { d.diiCash = snap.fii_dii_cash.dii_cash; f.diiCash = true; }
+  }
+
+  // Participant OI
+  if (snap.participant_oi) {
+    const p = snap.participant_oi;
+    const fiiLong = p.fii_long_pct ?? p.fpi_long_pct;
+    const fiiShort = p.fii_short_pct ?? p.fpi_short_pct;
+    if (fiiLong != null) { d.fiiLongPct = fiiLong; f.fiiLongPct = true; }
+    if (fiiShort != null) { d.fiiShortPct = fiiShort; f.fiiShortPct = true; }
+    if (p.client_long_pct != null) { d.clientLongPct = p.client_long_pct; f.clientLongPct = true; }
+    if (p.pro_long_pct != null) { d.proLongPct = p.pro_long_pct; f.proLongPct = true; }
+    setBadge('badge-participants', 'fetched', 'LIVE');
+  } else {
+    setBadge('badge-participants', 'err', 'FAIL');
+  }
+
+  saveState();
+  renderInputs();
+  document.getElementById('lastFetch').textContent = 'Last fetched: ' + new Date().toLocaleTimeString() + ' IST';
+}
+
+/* ============================================
+   BIAS ENGINE
+   ============================================ */
+function computeBias() {
+  const d = STATE.data[STATE.asset];
+  const num = k => { const v = parseFloat(d[k]); return isNaN(v) ? null : v; };
+
+  const spot = num('spot'), pcr = num('pcr'), maxPain = num('maxPain'), vix = num('vix'), vixChange = num('vixChange');
+  const fiiCash = num('fiiCash'), diiCash = num('diiCash');
+  const fiiLong = num('fiiLongPct'), fiiShort = num('fiiShortPct');
+  const clientLong = num('clientLongPct'), proLong = num('proLongPct');
+  const oiBehaviour = d.oiBehaviour;
+
+  const components = [];
+
+  if (pcr !== null) {
+    let s = 0, sig = '';
+    if (pcr >= 1.5)       { s = +1.5; sig = 'Oversold · contrarian bullish'; }
+    else if (pcr >= 1.2)  { s = +2;   sig = 'Bullish · puts being written'; }
+    else if (pcr >= 1.0)  { s = +1;   sig = 'Mildly bullish'; }
+    else if (pcr >= 0.85) { s =  0;   sig = 'Neutral'; }
+    else if (pcr >= 0.7)  { s = -1;   sig = 'Mildly bearish'; }
+    else if (pcr >= 0.5)  { s = -2;   sig = 'Bearish · calls being written'; }
+    else                  { s = -1.5; sig = 'Overbought · contrarian bearish'; }
+    components.push({ name: 'PCR', score: s, signal: sig, value: pcr.toFixed(2) });
+  }
+
+  if (fiiCash !== null) {
+    let s = 0, sig = '';
+    if (fiiCash >= 3000)       { s = +2;   sig = 'Heavy FII buying'; }
+    else if (fiiCash >= 1000)  { s = +1.5; sig = 'FII net buyer'; }
+    else if (fiiCash >= 0)     { s = +0.5; sig = 'FII mildly positive'; }
+    else if (fiiCash >= -1000) { s = -0.5; sig = 'FII mildly negative'; }
+    else if (fiiCash >= -3000) { s = -1.5; sig = 'FII net seller'; }
+    else                       { s = -2;   sig = 'Heavy FII selling'; }
+    components.push({ name: 'FII Cash', score: s, signal: sig, value: fmtCr(fiiCash) });
+  }
+
+  if (diiCash !== null) {
+    let s = 0, sig = '';
+    if (diiCash >= 2000)       { s = +1.5; sig = 'Strong DII support'; }
+    else if (diiCash >= 500)   { s = +1;   sig = 'DII buying'; }
+    else if (diiCash >= -500)  { s =  0;   sig = 'DII flat'; }
+    else if (diiCash >= -2000) { s = -1;   sig = 'DII selling'; }
+    else                       { s = -1.5; sig = 'Heavy DII selling'; }
+    components.push({ name: 'DII Cash', score: s, signal: sig, value: fmtCr(diiCash) });
+  }
+
+  if (fiiLong !== null && fiiShort !== null) {
+    let s = 0, sig = '';
+    if (fiiLong >= 70)      { s = +2;   sig = 'FII heavily long futures'; }
+    else if (fiiLong >= 55) { s = +1.5; sig = 'FII net long'; }
+    else if (fiiLong >= 45) { s =  0;   sig = 'FII positioning balanced'; }
+    else if (fiiLong >= 30) { s = -1.5; sig = 'FII net short'; }
+    else                    { s = -2;   sig = 'FII heavily short'; }
+    components.push({ name: 'FII F&O Long%', score: s, signal: sig, value: fiiLong.toFixed(1) + '%' });
+  }
+
+  if (clientLong !== null && proLong !== null) {
+    const diff = clientLong - proLong;
+    let s = 0, sig = '';
+    if (diff >= 20)       { s = -1.5; sig = 'Retail crowded long · contrarian'; }
+    else if (diff >= 10)  { s = -0.5; sig = 'Retail leaning long'; }
+    else if (diff >= -10) { s =  0;   sig = 'Retail/Pro aligned'; }
+    else if (diff >= -20) { s = +0.5; sig = 'Retail leaning short'; }
+    else                  { s = +1.5; sig = 'Retail crowded short · contrarian'; }
+    components.push({ name: 'Retail vs Pro', score: s, signal: sig, value: (diff>=0?'+':'') + diff.toFixed(0) + '%' });
+  }
+
+  if (maxPain !== null && spot !== null) {
+    const diffPct = ((maxPain - spot) / spot) * 100;
+    let s = 0, sig = '';
+    if (diffPct >= 0.8)       { s = +1.5; sig = 'Max Pain well above · pulls up'; }
+    else if (diffPct >= 0.2)  { s = +0.5; sig = 'Max Pain above spot'; }
+    else if (diffPct >= -0.2) { s =  0;   sig = 'Max Pain at spot · pin risk'; }
+    else if (diffPct >= -0.8) { s = -0.5; sig = 'Max Pain below spot'; }
+    else                      { s = -1.5; sig = 'Max Pain well below · pulls down'; }
+    components.push({ name: 'Max Pain Gravity', score: s, signal: sig, value: (diffPct>=0?'+':'') + diffPct.toFixed(2) + '%' });
+  }
+
+  let vixRegime = 'normal';
+  if (vix !== null) {
+    let s = 0, sig = '';
+    if (vix < 12)      { s = +0.5; sig = 'Low VIX · trending day likely'; vixRegime = 'low'; }
+    else if (vix < 16) { s =  0;   sig = 'VIX normal'; vixRegime = 'normal'; }
+    else if (vix < 22) { s = -0.5; sig = 'Elevated VIX · volatile'; vixRegime = 'high'; }
+    else               { s = -1;   sig = 'High VIX · fear regime'; vixRegime = 'fear'; }
+    if (vixChange !== null) {
+      if (vixChange > 5) s -= 0.5;
+      else if (vixChange < -5) s += 0.5;
+    }
+    components.push({ name: 'India VIX', score: s, signal: sig, value: vix.toFixed(2) + (vixChange!==null?` (${vixChange>=0?'+':''}${vixChange.toFixed(1)}%)`:'') });
+  }
+
+  if (oiBehaviour) {
+    const m = {
+      longBuildup:    { s: +2,   sig: 'Long buildup · trend up' },
+      shortCovering:  { s: +1,   sig: 'Short covering · rally' },
+      longUnwinding:  { s: -1,   sig: 'Long unwinding · weak' },
+      shortBuildup:   { s: -2,   sig: 'Short buildup · trend down' },
+      neutral:        { s:  0,   sig: 'Mixed / range-bound' }
+    }[oiBehaviour];
+    if (m) components.push({ name: 'OI Buildup', score: m.s, signal: m.sig, value: oiBehaviour });
+  }
+
+  const totalScore = components.reduce((a,c) => a + c.score, 0);
+  const maxPossible = components.length * 2;
+  const normalized = maxPossible ? (totalScore / maxPossible) : 0;
+
+  let bias, biasColor;
+  if (normalized >= 0.5)        { bias = 'STRONG BULLISH'; biasColor = 'bull'; }
+  else if (normalized >= 0.2)   { bias = 'BULLISH';        biasColor = 'bull'; }
+  else if (normalized > -0.2)   { bias = 'SIDEWAYS';       biasColor = 'side'; }
+  else if (normalized > -0.5)   { bias = 'BEARISH';        biasColor = 'bear'; }
+  else                          { bias = 'STRONG BEARISH'; biasColor = 'bear'; }
+
+  let dayType;
+  if (Math.abs(normalized) < 0.2 && vixRegime === 'low') dayType = 'Range-bound / Sideways (low VIX)';
+  else if (Math.abs(normalized) < 0.2) dayType = 'Choppy · Volatile range';
+  else if (normalized >= 0.2) dayType = vixRegime === 'low' ? 'Trending Upside' : 'Volatile Upside Bias';
+  else dayType = vixRegime === 'low' ? 'Trending Downside' : 'Volatile Downside Bias';
+
+  const confidence = Math.round(Math.abs(normalized) * 100);
+  const resistance = parseList(d.callOI).slice(0, 3);
+  const support = parseList(d.putOI).slice(0, 3);
+  const strategy = buildStrategy(bias, dayType, spot, resistance, support, vixRegime);
+
+  STATE.bias = { bias, biasColor, dayType, confidence, components, resistance, support, spot, totalScore, normalized, strategy, vixRegime };
+  return STATE.bias;
+}
+
+function parseList(s) { if (!s) return []; return String(s).split(',').map(x => parseFloat(x.trim())).filter(x => !isNaN(x)); }
+function fmtCr(n) { if (n === null || isNaN(n)) return '—'; const s = n >= 0 ? '+' : '−'; return `${s}₹${Math.abs(n).toLocaleString('en-IN')} Cr`; }
+function fmtNum(n) { if (n === null || isNaN(n)) return '—'; return Number(n).toLocaleString('en-IN', { maximumFractionDigits: 2 }); }
+
+function buildStrategy(bias, dayType, spot, res, sup, vixRegime) {
+  if (!spot) return 'Enter spot price to receive trade plan.';
+  const r1 = res[0], s1 = sup[0];
+  let txt = '';
+  if (bias.includes('BULLISH')) {
+    txt = `<strong>Setup:</strong> Buy-on-dips. Look for entries near <strong>${fmtNum(s1)}</strong> (S1) for moves toward <strong>${fmtNum(r1)}</strong> (R1).`;
+    if (vixRegime === 'low') txt += ` Low VIX favours <strong>Bull Call Spreads</strong> or naked CE buys at S1 bounce.`;
+    else txt += ` Elevated VIX — prefer <strong>Bull Put Spreads</strong> to harvest premium.`;
+    txt += ` <strong>Invalidation:</strong> sustained close below ${fmtNum(s1)}.`;
+  } else if (bias.includes('BEARISH')) {
+    txt = `<strong>Setup:</strong> Sell-on-rises. Look for shorts near <strong>${fmtNum(r1)}</strong> (R1) for moves toward <strong>${fmtNum(s1)}</strong> (S1).`;
+    if (vixRegime === 'low') txt += ` Low VIX → <strong>Bear Put Spreads</strong> or naked PE buys at R1 rejection.`;
+    else txt += ` Elevated VIX → <strong>Bear Call Spreads</strong>.`;
+    txt += ` <strong>Invalidation:</strong> sustained close above ${fmtNum(r1)}.`;
+  } else {
+    txt = `<strong>Setup:</strong> Range-trading day. Buy near <strong>${fmtNum(s1)}</strong>, sell near <strong>${fmtNum(r1)}</strong>.`;
+    if (vixRegime === 'low') txt += ` Premium-decay regime — favour <strong>Iron Condor</strong> or <strong>Short Straddle</strong>.`;
+    else txt += ` VIX too high for naked premium-selling; scalp with tight stops.`;
+    txt += ` <strong>Breakout watch:</strong> close beyond ${fmtNum(r1)} or ${fmtNum(s1)} flips bias.`;
+  }
+  return txt;
+}
+
+/* ============================================
+   RENDER
+   ============================================ */
+function renderBias() {
+  const b = STATE.bias;
+  if (!b) return;
+  const card = document.getElementById('biasCard');
+  const ring = document.getElementById('confRing');
+  const verdict = document.getElementById('biasVerdict');
+  const meta = document.getElementById('biasMeta');
+  ['bull','bear','side'].forEach(c => { card.classList.remove(c); ring.classList.remove(c); verdict.classList.remove(c); });
+  card.classList.add(b.biasColor); ring.classList.add(b.biasColor); verdict.classList.add(b.biasColor);
+  verdict.textContent = b.bias;
+  meta.textContent = `${b.dayType} · Score ${b.totalScore.toFixed(1)} · ${b.components.length} signals`;
+  const circ = 2 * Math.PI * 42;
+  document.getElementById('confProgress').style.strokeDashoffset = circ - (b.confidence / 100) * circ;
+  document.getElementById('confVal').textContent = b.confidence + '%';
+
+  const resHtml = b.resistance.length ? b.resistance.map((v,i) => `<div class="level-row"><span class="level-tag">R${i+1}</span><span class="level-val">${fmtNum(v)}</span></div>`).join('') : `<div class="level-row"><span class="level-tag">—</span><span class="level-val">No data</span></div>`;
+  const supHtml = b.support.length ? b.support.map((v,i) => `<div class="level-row"><span class="level-tag">S${i+1}</span><span class="level-val">${fmtNum(v)}</span></div>`).join('') : `<div class="level-row"><span class="level-tag">—</span><span class="level-val">No data</span></div>`;
+  document.getElementById('resList').innerHTML = resHtml;
+  document.getElementById('supList').innerHTML = supHtml;
+
+  document.getElementById('strategyBox').style.display = 'block';
+  document.getElementById('strategyText').innerHTML = b.strategy;
+
+  document.getElementById('componentsList').innerHTML = b.components.map(c => {
+    const pct = Math.max(0, Math.min(100, 50 + (c.score / 2) * 50));
+    const color = c.score > 0.3 ? 'var(--bull)' : c.score < -0.3 ? 'var(--bear)' : 'var(--side)';
+    const sign = c.score > 0 ? '+' : '';
+    const startX = c.score >= 0 ? 50 : pct;
+    const widthX = Math.abs(pct - 50);
+    return `<div class="component-row"><div><div class="component-name">${c.name}</div><div class="component-signal">${c.value} · ${c.signal}</div></div><div class="component-bar"><div class="component-fill" style="left:${startX}%; width:${widthX}%; background:${color};"></div></div><div class="component-score" style="color:${color};">${sign}${c.score.toFixed(1)}</div><div></div></div>`;
+  }).join('');
+}
+
+function resetOutput() {
+  document.getElementById('biasVerdict').textContent = 'AWAITING DATA';
+  document.getElementById('biasMeta').textContent = 'Fetch from NSE or enter manually, then compute';
+  document.getElementById('confVal').textContent = '—';
+  document.getElementById('confProgress').style.strokeDashoffset = 263.9;
+  ['biasCard','confRing','biasVerdict'].forEach(id => { const el = document.getElementById(id); el.className = el.id === 'biasCard' ? 'bias-card side' : (el.id === 'confRing' ? 'confidence-ring side' : 'bias-verdict side'); });
+  document.getElementById('strategyBox').style.display = 'none';
+  document.getElementById('componentsList').innerHTML = '<div class="empty-state">Compute bias to see the contribution of each signal.</div>';
+  resetLevelLists();
+}
+
+function renderHistory() {
+  const hist = loadHistory();
+  const body = document.getElementById('histBody');
+  if (!hist.length) { body.innerHTML = '<tr><td colspan="8"><div class="empty-state">No saved reads yet.</div></td></tr>'; return; }
+  body.innerHTML = hist.slice(-15).reverse().map(h => `<tr><td>${h.date}</td><td>${h.asset === 'nifty' ? 'NIFTY' : 'BNF'}</td><td class="verdict-cell ${h.biasColor}">${h.bias}</td><td>${h.confidence}%</td><td>${fmtNum(h.spot) || '—'}</td><td>${fmtNum(h.r1) || '—'}</td><td>${fmtNum(h.s1) || '—'}</td><td>${h.pcr ?? '—'}</td></tr>`).join('');
+}
+
+/* ============================================
+   ACTIONS
+   ============================================ */
+function toast(msg, color='var(--bull)') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.style.borderColor = color;
+  t.style.color = color;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2800);
+}
+
+document.getElementById('fetchAllBtn').addEventListener('click', fetchAll);
+
+document.getElementById('computeBtn').addEventListener('click', () => {
+  const b = computeBias();
+  if (!b.components.length) { toast('⚠ Need at least 2 signals to compute', 'var(--side)'); return; }
+  renderBias();
+  toast(`Bias: ${b.bias} (${b.confidence}%)`);
+});
+
+document.getElementById('saveBtn').addEventListener('click', () => {
+  if (!STATE.bias) { toast('⚠ Compute bias first', 'var(--side)'); return; }
+  const b = STATE.bias, d = STATE.data[STATE.asset];
+  const entry = { date: new Date().toLocaleDateString('en-IN', { day:'2-digit', month:'short' }), asset: STATE.asset, bias: b.bias, biasColor: b.biasColor, dayType: b.dayType, confidence: b.confidence, spot: b.spot, r1: b.resistance[0], s1: b.support[0], pcr: d.pcr, timestamp: Date.now() };
+  const hist = loadHistory(); hist.push(entry); if (hist.length > 60) hist.splice(0, hist.length - 60); saveHistory(hist);
+  renderHistory();
+  toast('Saved to history ✓');
+});
+
+document.getElementById('copyMsgBtn').addEventListener('click', async () => {
+  if (!STATE.bias) { toast('⚠ Compute bias first', 'var(--side)'); return; }
+  const b = STATE.bias;
+  const d = new Date().toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'numeric' });
+  const asset = STATE.asset === 'nifty' ? 'NIFTY 50' : 'BANK NIFTY';
+  const emoji = b.biasColor === 'bull' ? '📈' : b.biasColor === 'bear' ? '📉' : '↔️';
+  let msg = `${emoji} ${asset} BIAS · ${d}\n━━━━━━━━━━━━━━━━━\n\nBIAS: ${b.bias}\nDAY: ${b.dayType}\nCONF: ${b.confidence}%\n`;
+  if (b.spot) msg += `SPOT: ${fmtNum(b.spot)}\n`;
+  msg += `\n🔴 Resistance:\n` + b.resistance.map((v,i) => `  R${i+1} → ${fmtNum(v)}`).join('\n');
+  msg += `\n🟢 Support:\n` + b.support.map((v,i) => `  S${i+1} → ${fmtNum(v)}`).join('\n');
+  msg += `\n\nKey Signals:\n` + b.components.slice(0,6).map(c => {
+    const a = c.score > 0.3 ? '🟢' : c.score < -0.3 ? '🔴' : '⚪';
+    return `${a} ${c.name}: ${c.value}`;
+  }).join('\n');
+  msg += `\n\nPlan: ${b.strategy.replace(/<[^>]+>/g, '')}\n\n_Educational only_`;
+  try { await navigator.clipboard.writeText(msg); toast('Summary copied ✓'); }
+  catch (e) { toast('Copy failed', 'var(--bear)'); }
+});
+
+document.getElementById('resetBtn').addEventListener('click', () => {
+  if (!confirm('Clear inputs for ' + (STATE.asset === 'nifty' ? 'NIFTY' : 'BANK NIFTY') + '?')) return;
+  STATE.data[STATE.asset] = {}; STATE.fetchedFlags[STATE.asset] = {};
+  setBadge('badge-participants', '', 'MANUAL'); setBadge('badge-optionchain', '', 'MANUAL');
+  renderInputs(); STATE.bias = null; resetOutput(); saveState();
+  toast('Reset ✓', 'var(--side)');
+});
+
+document.getElementById('clearHistBtn').addEventListener('click', () => {
+  if (!confirm('Delete all history?')) return;
+  saveHistory([]); renderHistory(); toast('History cleared', 'var(--side)');
+});
+
+/* ============================================
+   INIT
+   ============================================ */
+(async () => {
+  setTodayDate();
+  loadState();
+  renderInputs();
+  bindInputs();
+  renderHistory();
+
+  // health check
+  const ok = await apiHealth();
+  const pill = document.getElementById('apiStatus');
+  if (ok) {
+    pill.className = 'status-pill';
+    pill.innerHTML = '<div class="status-dot"></div>BACKEND OK';
+  } else {
+    pill.className = 'status-pill err';
+    pill.innerHTML = '<div class="status-dot"></div>BACKEND DOWN';
+    document.getElementById('lastFetch').textContent = 'Backend unreachable — manual entry mode';
+  }
+})();
+</script>
+</body>
+</html>
